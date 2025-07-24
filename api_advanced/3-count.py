@@ -7,27 +7,30 @@ import re
 
 def count_words(subreddit, word_list, word_count=None, after=None):
     if word_count is None:
-        # Normalize word list to lowercase, and sum counts for duplicates
+        # Normalize and handle duplicates
         word_count = {}
         for word in word_list:
             w = word.lower()
-            word_count[w] = word_count.get(w, 0) + 0  # initialize at 0
-
-    url = "https://www.reddit.com/r/{}/hot.json".format(subreddit)
+            word_count[w] = word_count.get(w, 0)
+    
+    url = f"https://www.reddit.com/r/{subreddit}/hot.json"
     headers = {'User-Agent': 'cynt user agent 1.1'}
     params = {'limit': 100}
     if after:
         params['after'] = after
 
-    response = requests.get(url, headers=headers, params=params, allow_redirects=False)
+    try:
+        response = requests.get(url, headers=headers, params=params, allow_redirects=False, timeout=10)
+    except Exception:
+        return  # Don't print anything on request failure
+
     if response.status_code != 200:
-        return
+        return  # Don't print anything if subreddit is invalid
 
     data = response.json().get('data', {})
     posts = data.get('children', [])
     after = data.get('after', None)
 
-    # Compile regex for each word in word_list for word boundaries, case-insensitive
     regexes = {w: re.compile(r'\b{}\b'.format(re.escape(w)), re.IGNORECASE) for w in word_count}
 
     for post in posts:
@@ -37,16 +40,12 @@ def count_words(subreddit, word_list, word_count=None, after=None):
             word_count[w] += len(matches)
 
     if after:
-        # More posts, so recurse
-        return count_words(subreddit, word_list, word_count, after)
+        count_words(subreddit, word_list, word_count, after)
     else:
-        # Print results sorted as required
-        filtered = {k: v for k, v in word_count.items() if v > 0}
+        # Filter and print only words that matched at least once
+        filtered = [(k, v) for k, v in word_count.items() if v > 0]
         if not filtered:
-            return
-        # Sort: by count descending, then alphabetically ascending
-        sorted_words = sorted(filtered.items(), key=lambda x: (-x[1], x[0]))
-        for word, count in sorted_words:
+            return  # Don't print anything if there are no matches
+        # Sort: by count descending, then alphabetically
+        for word, count in sorted(filtered, key=lambda x: (-x[1], x[0])):
             print(f"{word}: {count}")
-
-
