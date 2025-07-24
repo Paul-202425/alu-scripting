@@ -7,7 +7,7 @@ import re
 
 def count_words(subreddit, word_list, word_count=None, after=None):
     if word_count is None:
-        # Normalize and handle duplicates
+        # Combine duplicate keywords (case-insensitive)
         word_count = {}
         for word in word_list:
             w = word.lower()
@@ -20,18 +20,20 @@ def count_words(subreddit, word_list, word_count=None, after=None):
         params['after'] = after
 
     try:
-        response = requests.get(url, headers=headers, params=params, allow_redirects=False, timeout=10)
+        response = requests.get(url, headers=headers, params=params,
+                                allow_redirects=False, timeout=10)
+        if response.status_code != 200:
+            return
+        data = response.json().get('data', {})
     except Exception:
-        return  # Don't print anything on request failure
+        return
 
-    if response.status_code != 200:
-        return  # Don't print anything if subreddit is invalid
-
-    data = response.json().get('data', {})
     posts = data.get('children', [])
     after = data.get('after', None)
 
-    regexes = {w: re.compile(r'\b{}\b'.format(re.escape(w)), re.IGNORECASE) for w in word_count}
+    # Prepare regex patterns for each keyword (whole word, case-insensitive)
+    regexes = {w: re.compile(r'\b{}\b'.format(re.escape(w)), re.IGNORECASE)
+               for w in word_count}
 
     for post in posts:
         title = post['data'].get('title', '')
@@ -39,13 +41,14 @@ def count_words(subreddit, word_list, word_count=None, after=None):
             matches = regex.findall(title)
             word_count[w] += len(matches)
 
+    # Recursive call if more posts are available
     if after:
         count_words(subreddit, word_list, word_count, after)
     else:
-        # Filter and print only words that matched at least once
+        # Only print words with count > 0, sorted as required
         filtered = [(k, v) for k, v in word_count.items() if v > 0]
         if not filtered:
-            return  # Don't print anything if there are no matches
-        # Sort: by count descending, then alphabetically
+            return  # Print nothing if there are no matches
         for word, count in sorted(filtered, key=lambda x: (-x[1], x[0])):
             print(f"{word}: {count}")
+
