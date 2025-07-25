@@ -2,6 +2,7 @@
 """ top_ten.py """
 import requests
 
+
 def top_ten(subreddit):
     url = 'https://www.reddit.com/r/{}/hot.json?limit=10'.format(subreddit)
     headers = {'User-Agent': 'myRedditScript/0.1 by u/Due-Memory4378'}
@@ -14,5 +15,4 @@ def top_ten(subreddit):
         for post in posts:
             print(post['data']['title'])
     else:
-        # For empty posts, print nothing (not "None"), unless instructions say otherwise
         pass
